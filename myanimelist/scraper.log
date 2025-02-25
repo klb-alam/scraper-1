@@ -1,0 +1,43 @@
+2025-02-18 09:51:21,857 - DEBUG - Starting MAL Anime Scraper
+2025-02-18 09:51:21,858 - INFO - Starting scraping for MAL IDs: [59356, 56036, 2928, 3269, 4469, 454, 1143, 299, 9332, 8950]
+2025-02-18 09:51:21,858 - INFO - Scraping MAL ID: 59356
+2025-02-18 09:51:21,863 - DEBUG - Starting new HTTPS connection (1): myanimelist.net:443
+2025-02-18 09:51:22,828 - DEBUG - https://myanimelist.net:443 "GET /anime/59356 HTTP/11" 200 None
+2025-02-18 09:51:23,096 - INFO - Successfully scraped data for ID: 59356
+2025-02-18 09:51:23,097 - INFO - Scraping MAL ID: 56036
+2025-02-18 09:51:23,098 - DEBUG - Starting new HTTPS connection (1): myanimelist.net:443
+2025-02-18 09:51:24,014 - DEBUG - https://myanimelist.net:443 "GET /anime/56036 HTTP/11" 200 None
+2025-02-18 09:51:24,278 - INFO - Successfully scraped data for ID: 56036
+2025-02-18 09:51:24,278 - INFO - Scraping MAL ID: 2928
+2025-02-18 09:51:24,279 - DEBUG - Starting new HTTPS connection (1): myanimelist.net:443
+2025-02-18 09:51:25,238 - DEBUG - https://myanimelist.net:443 "GET /anime/2928 HTTP/11" 200 None
+2025-02-18 09:51:25,683 - INFO - Successfully scraped data for ID: 2928
+2025-02-18 09:51:25,684 - INFO - Scraping MAL ID: 3269
+2025-02-18 09:51:25,685 - DEBUG - Starting new HTTPS connection (1): myanimelist.net:443
+2025-02-18 09:51:26,802 - DEBUG - https://myanimelist.net:443 "GET /anime/3269 HTTP/11" 200 None
+2025-02-18 09:51:27,427 - INFO - Successfully scraped data for ID: 3269
+2025-02-18 09:51:27,428 - INFO - Scraping MAL ID: 4469
+2025-02-18 09:51:27,430 - DEBUG - Starting new HTTPS connection (1): myanimelist.net:443
+2025-02-18 09:51:28,321 - DEBUG - https://myanimelist.net:443 "GET /anime/4469 HTTP/11" 200 None
+2025-02-18 09:51:28,713 - INFO - Successfully scraped data for ID: 4469
+2025-02-18 09:51:28,714 - INFO - Scraping MAL ID: 454
+2025-02-18 09:51:28,715 - DEBUG - Starting new HTTPS connection (1): myanimelist.net:443
+2025-02-18 09:51:29,618 - DEBUG - https://myanimelist.net:443 "GET /anime/454 HTTP/11" 200 None
+2025-02-18 09:51:30,063 - INFO - Successfully scraped data for ID: 454
+2025-02-18 09:51:30,063 - INFO - Scraping MAL ID: 1143
+2025-02-18 09:51:30,066 - DEBUG - Starting new HTTPS connection (1): myanimelist.net:443
+2025-02-18 09:51:31,036 - DEBUG - https://myanimelist.net:443 "GET /anime/1143 HTTP/11" 200 None
+2025-02-18 09:51:31,440 - INFO - Successfully scraped data for ID: 1143
+2025-02-18 09:51:31,442 - INFO - Scraping MAL ID: 299
+2025-02-18 09:51:31,443 - DEBUG - Starting new HTTPS connection (1): myanimelist.net:443
+2025-02-18 09:51:32,329 - DEBUG - https://myanimelist.net:443 "GET /anime/299 HTTP/11" 200 None
+2025-02-18 09:51:32,956 - INFO - Successfully scraped data for ID: 299
+2025-02-18 09:51:32,956 - INFO - Scraping MAL ID: 9332
+2025-02-18 09:51:32,958 - DEBUG - Starting new HTTPS connection (1): myanimelist.net:443
+2025-02-18 09:51:34,026 - DEBUG - https://myanimelist.net:443 "GET /anime/9332 HTTP/11" 200 None
+2025-02-18 09:51:34,639 - INFO - Successfully scraped data for ID: 9332
+2025-02-18 09:51:34,640 - INFO - Scraping MAL ID: 8950
+2025-02-18 09:51:34,641 - DEBUG - Starting new HTTPS connection (1): myanimelist.net:443
+2025-02-18 09:51:35,530 - DEBUG - https://myanimelist.net:443 "GET /anime/8950 HTTP/11" 200 None
+2025-02-18 09:51:35,899 - INFO - Successfully scraped data for ID: 8950
+2025-02-18 09:51:35,902 - INFO - Scraping completed. Data saved to output/20250218.json
