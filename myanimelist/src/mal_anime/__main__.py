@@ -30,7 +30,7 @@ def parse_args():
         "-c",
         "--config",
         type=str,
-        default="myanimelist/src/mal_anime/config/config.yaml",
+        default="src/mal_anime/config/config.yaml",
         help="Config file path",
     )
     parser.add_argument(

@@ -9,6 +9,11 @@ from pathlib import Path
 import logging
 import time
 import re
+from .anime_checkpoint import AnimeCheckpointHandler
+from .utils import paginate_anime
+import aiohttp
+import asyncio
+import os
 
 
 class MALUrlGenerator(IUrlGenerator):
@@ -49,7 +54,7 @@ class MALDataTransformer(IDataTransformer):
                 "relatedEntries": self._extract_related_entries(soup),
                 "themeSongs": self._extract_theme_songs(soup),
                 "streamingPlatforms": self._extract_streaming_platforms(soup),
-                "voiceActors": self._extract_voice_actors(soup),
+                "voiceActors": self._extract_characters_voice_actors_list(soup),
             },
         }
 
@@ -460,17 +465,6 @@ class MALDataTransformer(IDataTransformer):
             )
             return []
 
-    def _extract_voice_actors(self, soup: BeautifulSoup) -> List[Dict]:
-        """Extract individual voice actors"""
-
-        # Find the link to the Characters & Staff page.
-        characters_staff_link = soup.find("a", href=re.compile(r"/characters$"))
-        if not characters_staff_link:
-            logging.warning(
-                f"No Characters & Staff link found for anime ID {self.mal_id}"
-            )
-            return []
-
 
 class JSONDataStorage(IDataStorage):
     def store(self, data: Dict[str, Any], output_path: str) -> None:
@@ -528,9 +522,6 @@ class MALAnimeScraper:
 
             # Transform data
             transformed_data = self.data_transformer.transform(raw_data, mal_id)
-            # logging.debug(f"Transformed data: {json.dumps(transformed_data, indent=2)}")
-
-            # Store data
             self.data_storage.store(transformed_data, output_path)
             logging.debug(f"Data stored to {output_path}")
 
@@ -542,3 +533,85 @@ class MALAnimeScraper:
         url = self.url_generator.generate(mal_id)
         raw_data = self.data_scraper.scrape(url)
         return self.data_transformer.transform(raw_data, mal_id)
+
+    async def scrape_all_anime(
+        self,
+        output_prefix: str = "anime_data",
+        checkpoint_path: str = "anime_checkpoint.json",
+        save_checkpoint_interval: int = 5,  # Save checkpoint after every N successful scrapes
+    ) -> None:
+        """
+        Asynchronously paginate through all anime and scrape each one.
+        Supports checkpointing to resume from where it left off.
+
+        Args:
+            output_prefix (str): The prefix for the output files
+            checkpoint_path (str): Path to the checkpoint file
+            save_checkpoint_interval (int): How often to save the checkpoint
+        """
+
+        # Initialize checkpoint handler
+        checkpoint = AnimeCheckpointHandler(checkpoint_path)
+        successful_scrapes = 0
+        Path(os.path.dirname(output_prefix)).mkdir(parents=True, exist_ok=True)
+
+        async with aiohttp.ClientSession() as client:
+            async for anime in paginate_anime(client, checkpoint):
+                try:
+                    anime_id = anime["id"]
+
+                    # Skip if already completed
+                    if checkpoint.is_completed(anime_id):
+                        logging.debug(
+                            f"Skipping already processed anime ID: {anime_id}"
+                        )
+                        continue
+
+                    # Scrape the anime
+                    logging.info(f"Scraping anime ID: {anime_id} - {anime['title']}")
+                    record = self.scrape(anime_id)
+
+                    if record:
+                        # Define a unique output path for each anime
+                        file_path = f"{output_prefix}/{anime_id}.json"
+                        self.data_storage.store(record, file_path)
+
+                        # Mark as completed and update checkpoint
+                        checkpoint.mark_completed(anime_id)
+                        successful_scrapes += 1
+
+                        # Periodically save the checkpoint
+                        if successful_scrapes % save_checkpoint_interval == 0:
+                            checkpoint.save_checkpoint()
+
+                        logging.info(
+                            f"Scraped and stored anime {anime_id} (Total: {checkpoint.get_completed_count()})"
+                        )
+
+                except Exception as e:
+                    logging.error(f"Error scraping anime {anime_id}: {e}")
+                    # Pause a bit longer on error
+                    await asyncio.sleep(5)
+                    continue
+
+            # Final checkpoint save after complete
+            checkpoint.save_checkpoint()
+            logging.info(
+                f"Anime scraping completed. Total processed: {checkpoint.get_completed_count()}"
+            )
+
+    def get_anime_checkpoint_status(
+        self, checkpoint_path: str = "anime_checkpoint.json"
+    ) -> Dict:
+        """Get information about the current anime checkpoint status."""
+        from .anime_checkpoint import AnimeCheckpointHandler
+
+        checkpoint = AnimeCheckpointHandler(checkpoint_path)
+        letter, page = checkpoint.get_pagination_state()
+
+        return {
+            "checkpoint_file": checkpoint_path,
+            "completed_ids_count": checkpoint.get_completed_count(),
+            "current_letter": letter,
+            "current_page": page,
+        }
