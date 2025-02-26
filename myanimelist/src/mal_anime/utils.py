@@ -175,7 +175,5 @@ async def paginate_people(
                 break
 
             page += 1
-            # Small delay to avoid hitting rate limits
-            await asyncio.sleep(1)
 
     logging.info("Finished paginating through all people")

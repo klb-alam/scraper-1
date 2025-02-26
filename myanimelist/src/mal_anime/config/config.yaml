@@ -1,13 +1,4 @@
 mal_ids:
-  - 59356
-  - 56036
-  - 2928
-  - 3269
-  - 4469
-  - 454
-  - 1143
-  - 299
-  - 9332
-  - 8950
+  - 52991
 
-output_path: "output/mal_titles.jsonl"
+output_path: 'output/mal_titles.jsonl'

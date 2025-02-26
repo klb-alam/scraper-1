@@ -231,7 +231,7 @@ class MALPeopleScraper:
         self,
         output_prefix: str = "data",
         checkpoint_path: str = "people_checkpoint.json",
-        save_checkpoint_interval: int = 5,  # Save checkpoint after every N successful scrapes
+        save_checkpoint_interval: int = 1,  # Save checkpoint after every N successful scrapes
     ) -> None:
         """
         Asynchronously paginate through the people entry pages and scrape each individual voice actor page.
@@ -310,17 +310,3 @@ class MALPeopleScraper:
             logging.info(
                 f"Voice actor scraping completed. Total processed: {checkpoint.get_completed_count()}"
             )
-
-    def get_checkpoint_status(
-        self, checkpoint_path: str = "people_checkpoint.json"
-    ) -> Dict:
-        """Get information about the current checkpoint status."""
-        checkpoint = PeopleCheckpointHandler(checkpoint_path)
-        letter, page = checkpoint.get_pagination_state()
-
-        return {
-            "checkpoint_file": checkpoint_path,
-            "completed_ids_count": checkpoint.get_completed_count(),
-            "current_letter": letter,
-            "current_page": page,
-        }

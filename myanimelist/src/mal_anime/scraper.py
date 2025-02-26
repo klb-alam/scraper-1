@@ -14,6 +14,64 @@ from .utils import paginate_anime
 import aiohttp
 import asyncio
 import os
+from google.cloud import storage
+from .retry import make_request
+
+
+class GCSDataStorage(IDataStorage):
+    """Storage implementation for Google Cloud Storage"""
+
+    def __init__(self, bucket_name: str, project_id: str = None, base_path: str = ""):
+        """
+        Initialize GCS storage
+
+        Args:
+            bucket_name: Name of the GCS bucket
+            project_id: GCP project ID (optional - uses default if not specified)
+            base_path: Base path/folder within the bucket
+        """
+        self.client = storage.Client(project=project_id)
+        self.bucket = self.client.bucket(bucket_name)
+        self.base_path = base_path.rstrip("/")
+        logging.info(
+            f"Initialized GCS storage with bucket '{bucket_name}' and base path '{base_path}'"
+        )
+
+    def store(self, data: Dict[str, Any], output_path: str) -> None:
+        """Store a single record to GCS"""
+        # Extract anime ID from the data
+        anime_id = data.get("_airbyte_data", {}).get("id")
+        if not anime_id:
+            # Use filename from output_path if anime_id not found
+            filename = Path(output_path).name
+        else:
+            filename = f"{anime_id}.json"
+
+        # Construct full GCS path
+        blob_path = f"{self.base_path}/{filename}" if self.base_path else filename
+
+        # Convert data to JSON
+        json_data = json.dumps(data, ensure_ascii=False, indent=2)
+
+        # Upload to GCS
+        blob = self.bucket.blob(blob_path)
+        blob.upload_from_string(data=json_data, content_type="application/json")
+        logging.info(f"Data stored to gs://{self.bucket.name}/{blob_path}")
+
+    def store_all(self, records: List[Dict], output_path: str) -> None:
+        """Store multiple records to GCS"""
+        for record in records:
+            anime_id = record.get("_airbyte_data", {}).get("id")
+            if not anime_id:
+                logging.warning(f"Record missing anime ID, using index as filename")
+                continue
+
+            # Use store method to save individual record
+            self.store(record, f"{anime_id}.json")
+
+        logging.info(
+            f"All {len(records)} records stored to GCS bucket {self.bucket.name} in {self.base_path}"
+        )
 
 
 class MALUrlGenerator(IUrlGenerator):
@@ -23,10 +81,24 @@ class MALUrlGenerator(IUrlGenerator):
 
 
 class MALScraper(IDataScraper):
+
     @staticmethod
     def scrape(url: str) -> Dict[str, Any]:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+        }
         try:
-            response = requests.get(url)
+            response = make_request("GET", url, headers=headers)
             response.raise_for_status()
             return {"html": response.text, "url": url}
         except requests.RequestException as e:
@@ -417,6 +489,9 @@ class MALDataTransformer(IDataTransformer):
                 "table", class_="js-anime-character-table"
             )
 
+            if not character_tables:
+                return None
+
             for table in character_tables:
                 character_obj = {}
                 # Extract the character URL from the <a> tag with /character/ in href.
@@ -538,7 +613,7 @@ class MALAnimeScraper:
         self,
         output_prefix: str = "anime_data",
         checkpoint_path: str = "anime_checkpoint.json",
-        save_checkpoint_interval: int = 5,  # Save checkpoint after every N successful scrapes
+        save_checkpoint_interval: int = 1,  # Save checkpoint after every N successful scrapes
     ) -> None:
         """
         Asynchronously paginate through all anime and scrape each one.
