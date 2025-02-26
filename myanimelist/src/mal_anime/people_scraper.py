@@ -10,6 +10,8 @@ from bs4 import BeautifulSoup
 from google.cloud import storage
 from .interfaces import IDataTransformer, IDataStorage
 from .retry import make_request
+from .people_checkpoint import PeopleCheckpointHandler
+import asyncio
 
 
 class GCSDataStorage:
@@ -225,18 +227,29 @@ class MALPeopleScraper:
             logging.error(f"Failed to fetch {url}: {e}")
             return None
 
-    async def scrape_all_people(self, output_prefix: str = "data") -> None:
+    async def scrape_all_people(
+        self,
+        output_prefix: str = "data",
+        checkpoint_path: str = "people_checkpoint.json",
+        save_checkpoint_interval: int = 5,  # Save checkpoint after every N successful scrapes
+    ) -> None:
         """
-        Asynchronously paginate through the people entry pages (using utils.paginate_people)
-        and scrape each individual voice actor page.
+        Asynchronously paginate through the people entry pages and scrape each individual voice actor page.
+        Supports checkpointing to resume from where it left off.
 
         Args:
             output_prefix (str): The prefix for the GCS storage path
+            checkpoint_path (str): Path to the checkpoint file
+            save_checkpoint_interval (int): How often to save the checkpoint (after every N successful scrapes)
         """
         from .utils import paginate_people
 
+        # Initialize checkpoint handler
+        checkpoint = PeopleCheckpointHandler(checkpoint_path)
+        successful_scrapes = 0
+
         async with aiohttp.ClientSession() as client:
-            async for person_url in paginate_people(client):
+            async for person_url in paginate_people(client, checkpoint):
                 try:
                     people_id = int(person_url.rstrip("/").split("/")[-1])
                 except ValueError:
@@ -244,22 +257,70 @@ class MALPeopleScraper:
                     continue
 
                 try:
-                    raw_data = self.scrape(person_url)
-                    if raw_data is None:
+                    # Skip if already completed (additional check in case pagination logic missed it)
+                    if checkpoint.is_completed(people_id):
+                        logging.debug(
+                            f"Skipping already processed people ID: {people_id}"
+                        )
                         continue
 
+                    # Scrape the people page
+                    raw_data = self.scrape(person_url)
+                    if raw_data is None:
+                        logging.warning(
+                            f"Failed to scrape people ID: {people_id}, will retry later"
+                        )
+                        # Don't mark as completed, it will be retried on next run
+                        await asyncio.sleep(2)  # Small delay before continuing
+                        continue
+
+                    # Transform the data
                     voice_actor_data = self.data_transformer.transform(
                         raw_data, people_id
                     )
 
                     if voice_actor_data:
                         # Define a unique output path for each voice actor using their people_id.
-                        # Format: output_prefix/people_id.json
                         file_path = f"{output_prefix}/{people_id}.json"
                         self.data_storage.store(voice_actor_data, file_path)
+
+                        # Mark as completed and update checkpoint
+                        checkpoint.mark_completed(people_id)
+                        successful_scrapes += 1
+
+                        # Periodically save the checkpoint
+                        if successful_scrapes % save_checkpoint_interval == 0:
+                            checkpoint.save_checkpoint()
+
                         logging.info(
-                            f"Scraped and stored voice actor {people_id} to GCS"
+                            f"Scraped and stored voice actor {people_id} to GCS (Total: {checkpoint.get_completed_count()})"
                         )
+
+                    # Add a small delay to avoid rate limiting
+                    await asyncio.sleep(1)
+
                 except Exception as e:
                     logging.error(f"Error scraping voice actor {people_id}: {e}")
+                    # Pause a bit longer on error
+                    await asyncio.sleep(5)
                     continue
+
+            # Final checkpoint save after complete
+            checkpoint.save_checkpoint()
+            logging.info(
+                f"Voice actor scraping completed. Total processed: {checkpoint.get_completed_count()}"
+            )
+
+    def get_checkpoint_status(
+        self, checkpoint_path: str = "people_checkpoint.json"
+    ) -> Dict:
+        """Get information about the current checkpoint status."""
+        checkpoint = PeopleCheckpointHandler(checkpoint_path)
+        letter, page = checkpoint.get_pagination_state()
+
+        return {
+            "checkpoint_file": checkpoint_path,
+            "completed_ids_count": checkpoint.get_completed_count(),
+            "current_letter": letter,
+            "current_page": page,
+        }
